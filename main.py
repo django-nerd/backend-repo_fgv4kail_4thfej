@@ -1,6 +1,10 @@
 import os
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import ValidationError
+from typing import Any, Dict
+
+from schemas import ContactSubmission
 
 app = FastAPI()
 
@@ -63,6 +67,19 @@ def test_database():
     response["database_name"] = "✅ Set" if os.getenv("DATABASE_NAME") else "❌ Not Set"
     
     return response
+
+@app.post("/api/contact")
+def submit_contact(payload: ContactSubmission) -> Dict[str, Any]:
+    """Save contact form submissions to MongoDB"""
+    try:
+        from database import create_document
+        collection = ContactSubmission.__name__.lower()  # "contactsubmission"
+        doc_id = create_document(collection, payload)
+        return {"status": "ok", "id": doc_id}
+    except ValidationError as ve:
+        raise HTTPException(status_code=422, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to save submission: {str(e)}")
 
 
 if __name__ == "__main__":
